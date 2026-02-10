@@ -1,0 +1,11 @@
+Terminology:
+
+- Lazy Evaluation: 
+
+
+Misc:
+- For the evaluator, the steps are:
+    - identify operator
+    - decide on operands
+    - evaluate operands
+    - execute the operator (lazily if needed)
