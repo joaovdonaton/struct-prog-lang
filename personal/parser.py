@@ -1,5 +1,8 @@
 from tokenizer import tokenize
 
+# expression = term { ("+" | "-") term }
+# term = factor { ("*" | "/") factor }
+# factor = <number> | "(" expression ")"
 
 def parse_factor(tokens):
     # factor = <number>
@@ -7,6 +10,11 @@ def parse_factor(tokens):
 
     if token['tag'] == 'number':
         node = {'tag': 'number', 'value': token['value']}
+        return node, tokens[1:]
+    if token['tag'] == '(':
+        node, tokens = parse_expression(tokens[1:])
+        if tokens[0]['tag'] != ')':
+            raise SyntaxError('Expected \')\'')
         return node, tokens[1:]
     
     assert False, f'Expected a number, but got {token}'

@@ -1,4 +1,4 @@
-import parser
+import parser, tokenizer
 
 def evaluate(ast):
     if ast["tag"] == "number":
@@ -55,6 +55,10 @@ def test_evaluate():
         "tag": "%",
     }
     assert evaluate(ast) == 0
+
+    tokens = tokenizer.tokenize("(3-6)%2")
+    ast, tokens = parser.parse_expression(tokens)
+    assert evaluate(ast) == 1
 
 if __name__ == "__main__":
     test_evaluate()
