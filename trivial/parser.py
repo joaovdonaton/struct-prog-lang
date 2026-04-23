@@ -2,15 +2,11 @@ from tokenizer import tokenize
 from pprint import pprint
 
 grammar = """
-    JOAO FINAL PROJECT STUFF:
-
-    row = <number> {"," <number> }
-    matrix = "|" row {row ";"} "|"
-
-    GREGORY DELOZIER STUFF:
 
     simple_expression = identifier | <boolean> | <number> | <string> | <null> | matrix | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
 
+    row = <number> {"," <number> }
+    matrix = "|" row {";" row} "|"
     list = "[" expression { "," expression } "]"
     object = "{" [ expression ":" expression { "," expression ":" expression } ] "}"
     function = "function" "(" [ identifier { "," identifier } ] ")" statements
@@ -51,14 +47,83 @@ grammar = """
 ############################
 
 def parse_matrix(tokens):
-    pass
+    '''
+    row = <number> {"," <number> }
+    matrix = "|" row {";" row} "|"
+    '''
+    assert tokens[0]['tag'] == "|", f"Expected '|' at position {tokens[0]['position']}"
+    tokens = tokens[1:]
+
+    assert tokens[0]['tag'] != '|', f'Cannot have empty matrix.'
+
+    current_row_index = 0
+    rows = [[]]
+    rows[current_row_index].append(tokens[0]["value"])
+    tokens = tokens[1:]
+    while tokens[0]["tag"] == "," or tokens[0]['tag'] == ';':
+
+        if tokens[0]['tag'] == ';':
+            current_row_index += 1
+            rows.append([])
+
+        tokens = tokens[1:]
+        assert tokens[0]["tag"] == "number", f"Expected number at position {tokens[0]['position']}"
+
+        rows[current_row_index].append(tokens[0]["value"])
+        tokens = tokens[1:]
+
+    assert (
+        tokens[0]["tag"] == "|"
+    ), f"Expected '|' at position {tokens[0]['position']}, got {tokens[0:]}."
+
+
+    return {"tag": "matrix", "data": rows}, tokens[1:]
+
+
+def test_parse_matrix():
+    """
+    matrix = "|" row {";" row} "|"
+    """
+    print("testing parse_matrix...")
+
+    # test 1x1 matrix
+    ast, tokens = parse_matrix(tokenize("|1|"))
+    assert ast == {
+        "tag": "matrix",
+        "data": [[1]],
+    }
+    assert tokens[0]["tag"] is None
+
+    # test row matrix
+    ast, tokens = parse_matrix(tokenize("|1,2,3,4,5|"))
+    assert ast == {
+        "tag": "matrix",
+        "data": [[1, 2, 3, 4, 5]],
+    }
+    assert tokens[0]["tag"] is None
+
+    # lets also test a column matrix
+    ast, tokens = parse_matrix(tokenize("|1;2;3;4;5|"))
+    assert ast == {
+        "tag": "matrix",
+        "data": [[1], [2], [3], [4], [5]],
+    }
+    assert tokens[0]["tag"] is None
+
+    # test 2x2 matrix
+    ast, tokens = parse_matrix(tokenize("|1,2;3,4|"))
+    assert ast == {
+        "tag": "matrix",
+        "data": [[1, 2], [3, 4]],
+    }
+    assert tokens[0]["tag"] is None
 
 # BASIC EXPRESSIONS
 
 
 def parse_simple_expression(tokens):
     """
-    simple_expression = identifier | <boolean> | <number> | <string> | <null> | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
+    simple_expression = identifier | <boolean> | <number> | <string> | <null> | matrix | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
     """
 
     token = tokens[0]
@@ -92,13 +157,16 @@ def parse_simple_expression(tokens):
             tokens[0]["tag"] == ")"
         ), f"Expected ')' at position {tokens[0]['position']}"
         return ast, tokens[1:]
+    
+    if token['tag'] == '|':
+        return parse_matrix(tokens)
 
     assert False, f"Unexpected token '{token['tag']}' at position {token['position']}"
 
 
 def test_parse_simple_expression():
     """
-    simple_expression = identifier | <boolean> | <number> | <string> | <null> | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
+    simple_expression = identifier | <boolean> | <number> | <string> | <null> | matrix | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
     """
     print("testing parse_simple_expression...")
 
@@ -1633,6 +1701,7 @@ if __name__ == "__main__":
 
     test_functions = [
         test_parse_simple_expression,
+        test_parse_matrix
     ]
     test_grammar = grammar
 
