@@ -49,6 +49,10 @@ patterns = [
     [r"\,", ","],
     [r"\:", ":"],
     [r"\;", ";"],
+
+    # JOAO FINAL PROJECT
+    [r"\|", "|"],
+
     [r".", "error"],  # unexpected content
 ]
 
@@ -466,6 +470,35 @@ def test_complex_multiline_code():
     )
 
 
+# JOAO PROJECT
+def test_matrix_tokens():
+    print('testing matrix syntax token |')
+
+    tokens = tokenize('x = |3; 2|') # 1x2 matrix
+
+    assert(
+        tokens[2]['tag'] == '|',
+        tokens[3]['value'] == 3,
+        tokens[4]['tag'] == ';',
+        tokens[5]['value'] == 2,
+        tokens[6]['tag'] == '|'
+    )
+    
+    tokens = tokenize('x = |3, 99; 2, 13|') # 2x2 matrix
+
+    assert (
+        tokens[2]['tag'] == '|'
+        and tokens[3]['value'] == 3
+        and tokens[4]['tag'] == ','
+        and tokens[5]['value'] == 99
+        and tokens[6]['tag'] == ';'
+        and tokens[7]['value'] == 2
+        and tokens[8]['tag'] == ','
+        and tokens[9]['value'] == 13
+        and tokens[10]['tag'] == '|'
+    )
+
+
 if __name__ == "__main__":
     print("testing tokenizer.")
     test_simple_tokens()
@@ -479,6 +512,7 @@ if __name__ == "__main__":
     test_comments()
     test_error()
     test_if_identifier_sequence()
+    test_matrix_tokens()
     test_tag_coverage()
     test_line_and_column_tracking()
     test_multiline_code()

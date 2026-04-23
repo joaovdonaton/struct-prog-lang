@@ -2,7 +2,14 @@ from tokenizer import tokenize
 from pprint import pprint
 
 grammar = """
-    simple_expression = identifier | <boolean> | <number> | <string> | <null> | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
+    JOAO FINAL PROJECT STUFF:
+
+    row = <number> {"," <number> }
+    matrix = "|" row {row ";"} "|"
+
+    GREGORY DELOZIER STUFF:
+
+    simple_expression = identifier | <boolean> | <number> | <string> | <null> | matrix | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
 
     list = "[" expression { "," expression } "]"
     object = "{" [ expression ":" expression { "," expression ":" expression } ] "}"
@@ -39,6 +46,12 @@ grammar = """
     program = [ statement { ";" statement } {";"} ]
     """
 
+############################
+# JOAO FINAL PROJECT STUFF #
+############################
+
+def parse_matrix(tokens):
+    pass
 
 # BASIC EXPRESSIONS
 
