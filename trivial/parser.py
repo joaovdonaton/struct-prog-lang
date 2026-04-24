@@ -1,5 +1,6 @@
 from tokenizer import tokenize
 from pprint import pprint
+import numpy as np
 
 grammar = """
 
@@ -76,6 +77,11 @@ def parse_matrix(tokens):
         tokens[0]["tag"] == "|"
     ), f"Expected '|' at position {tokens[0]['position']}, got {tokens[0:]}."
 
+    # numpy conversion
+    try:
+        rows = np.array(rows)
+    except ValueError as e:
+        raise Exception("Matrix dimension sizes must be uniform") from e
 
     return {"tag": "matrix", "data": rows}, tokens[1:]
 
@@ -88,34 +94,26 @@ def test_parse_matrix():
 
     # test 1x1 matrix
     ast, tokens = parse_matrix(tokenize("|1|"))
-    assert ast == {
-        "tag": "matrix",
-        "data": [[1]],
-    }
+    assert ast["tag"] == "matrix"
+    assert np.array_equal(ast["data"], np.array([[1]]))
     assert tokens[0]["tag"] is None
 
     # test row matrix
     ast, tokens = parse_matrix(tokenize("|1,2,3,4,5|"))
-    assert ast == {
-        "tag": "matrix",
-        "data": [[1, 2, 3, 4, 5]],
-    }
+    assert ast["tag"] == "matrix"
+    assert np.array_equal(ast["data"], np.array([[1, 2, 3, 4, 5]]))
     assert tokens[0]["tag"] is None
 
     # lets also test a column matrix
     ast, tokens = parse_matrix(tokenize("|1;2;3;4;5|"))
-    assert ast == {
-        "tag": "matrix",
-        "data": [[1], [2], [3], [4], [5]],
-    }
+    assert ast["tag"] == "matrix"
+    assert np.array_equal(ast["data"], np.array([[1], [2], [3], [4], [5]]))
     assert tokens[0]["tag"] is None
 
     # test 2x2 matrix
     ast, tokens = parse_matrix(tokenize("|1,2;3,4|"))
-    assert ast == {
-        "tag": "matrix",
-        "data": [[1, 2], [3, 4]],
-    }
+    assert ast["tag"] == "matrix"
+    assert np.array_equal(ast["data"], np.array([[1, 2], [3, 4]]))
     assert tokens[0]["tag"] is None
 
 # BASIC EXPRESSIONS

@@ -3,7 +3,8 @@ from parser import parse
 from pprint import pprint
 import copy
 import errors
-
+import numpy as np
+from utilities import format_matrix
 
 def type_of(*args):
     def single_type(x):
@@ -234,6 +235,8 @@ def evaluate(ast, environment):
                 return result, "exit"
             items.append(result)
         return items, None
+    if ast["tag"] == "matrix":
+        return ast['data'], None
     if ast["tag"] == "object":
         object = {}
         for item in ast["items"]:
@@ -427,6 +430,8 @@ def evaluate(ast, environment):
                     value = "true"
                 if value == False:
                     value = "false"
+            if isinstance(value, np.ndarray):
+                value = format_matrix(value)
             print(str(value))
             return str(value) + "\n", None  # Return the printed value with newline
         else:
