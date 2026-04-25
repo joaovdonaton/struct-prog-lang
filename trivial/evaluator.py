@@ -177,10 +177,40 @@ def ast_to_string(ast):
     assert False, f"Unknown tag [{ast['tag']}] in AST"
 
 
-__builtin_functions = ["head", "tail", "length", "keys", "input"]
+__builtin_functions = ["head", "tail", "length", "keys", "input", "T", 'inv', 'dot']
 
 
 def evaluate_builtin_function(function_name, args):
+    if function_name == 'T':
+        assert len(args) == 1 and isinstance(
+            args[0], np.ndarray
+        ), "T() (transpose) function requires a matrix as input"
+        return np.transpose(args[0]), None
+    if function_name == 'inv':
+        assert len(args) == 1 and isinstance(
+            args[0], np.ndarray
+        ), "inv() (matrix inversion) function requires a matrix as input"
+        return np.linalg.inv(args[0]), None
+    if function_name == 'dot':
+        assert len(args) == 2 and isinstance(
+            args[0], np.ndarray
+        ) and isinstance(
+            args[1], np.ndarray
+        ), "dot() (dot product of vectors) function requires two matrices as input"
+        
+        # the way this works is:
+        # I make sure both operands are either column/row vectors 1xN or Nx1
+        # then remove the size 1 dimensions and apply dot product to get scalar
+        assert (args[0].shape[0] == 1 or args[0].shape[1] == 1), 'Error: one of the operands is not a row/column matrix'
+        assert (args[1].shape[0] == 1 or args[1].shape[1] == 1), 'Error: one of the operands is not a row/column matrix'
+
+        args[0] = np.squeeze(args[0])
+        args[1] = np.squeeze(args[1])
+
+        assert (args[0].shape[0] == args[1].shape[0]), f'Error: vectors must be of equal length: {args[0].shape[0]} and {args[1].shape[0]}'
+
+        return np.dot(args[0], args[1]), None
+
     if function_name == "head":
         assert len(args) == 1 and isinstance(
             args[0], list
@@ -1127,6 +1157,19 @@ def test_evaluate_builtins():
     # equals("input()", {}, "test_input_value") # This would require mocking
 
 
+def test_matrix_builtins():
+    print("test matrix builtins")
+
+    result, status = evaluate(parse(tokenize("T(|1,2;3,4|)")), {})
+    assert np.array_equal(result, np.array([[1, 3], [2, 4]]))
+
+    result, status = evaluate(parse(tokenize("dot(|1,2,3|, |4;5;6|)")), {})
+    assert result == 32
+
+    result, status = evaluate(parse(tokenize("inv(|1,2;3,5|)")), {})
+    assert np.array_equal(result, np.array([[-5, 2], [3, -1]]))
+
+
 def test_evaluator_with_new_tags():
     print("test evaluator with new tags...")
 
@@ -1312,6 +1355,7 @@ if __name__ == "__main__":
     test_evaluate_list_literal()
     test_evaluate_object_literal()
     test_evaluate_builtins()
+    test_matrix_builtins()
     test_evaluator_with_new_tags()
     test_scoping()
     test_closures()
