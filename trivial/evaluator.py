@@ -18,6 +18,8 @@ def type_of(*args):
             return "array"
         if isinstance(x, dict):
             return "object"
+        if isinstance(x, np.ndarray):
+            return "matrix"
         if x is None:
             return "null"
         assert False, f"Unknown type for value: {x}"
@@ -63,6 +65,7 @@ def ast_to_string(ast):
         "-",
         "/",
         "*",
+        "@",
         "%",
         "&&",
         "||",
@@ -277,6 +280,10 @@ def evaluate(ast, environment):
             return {**copy.deepcopy(left_value), **copy.deepcopy(right_value)}, None
         if types == "array-array":
             return copy.deepcopy(left_value) + copy.deepcopy(right_value), None
+        if types == "matrix-matrix":
+            if left_value.shape != right_value.shape:
+                raise Exception(f'Matrix shapes must be uniform for element-wise addition (tried to add {left_value.shape} to {right_value.shape})')
+            return left_value + right_value, None
         raise Exception(f"Illegal types for {ast['tag']}: {types}")
     if ast["tag"] == "-":
         left_value, l_status = evaluate(ast["left"], environment)
@@ -287,6 +294,10 @@ def evaluate(ast, environment):
             return right_value, "exit"
         types = type_of(left_value, right_value)
         if types == "number-number":
+            return left_value - right_value, None
+        if types == "matrix-matrix":
+            if left_value.shape != right_value.shape:
+                raise Exception(f'Matrix shapes must be uniform for element-wise subtraction (tried to subtract {left_value.shape} to {right_value.shape})')
             return left_value - right_value, None
         raise Exception(f"Illegal types for {ast["tag"]}:{types}")
 
@@ -304,7 +315,31 @@ def evaluate(ast, environment):
             return left_value * int(right_value), None
         if types == "number-string":
             return int(left_value) * right_value, None  # Corrected order
+        if types == "matrix-matrix":
+            if left_value.shape != right_value.shape:
+                raise Exception(f'Matrix shapes must be uniform for element-wise multiplication (tried to multiply {left_value.shape} to {right_value.shape})')
+            return left_value * right_value, None
+        
+        # same behavior for multiplying matrix*scalar or scalar*matrix
+        if types == "number-matrix":
+            return left_value * right_value, None
+        if types == "matrix-number":
+            return left_value * right_value, None
         raise Exception(f"Illegal types for {ast['tag']}:{types}")
+    
+    if ast["tag"] == "@":
+        left_value, l_status = evaluate(ast["left"], environment)
+        if l_status == "exit":
+            return left_value, "exit"
+        right_value, r_status = evaluate(ast["right"], environment)
+        if r_status == "exit":
+            return right_value, "exit"
+        types = type_of(left_value, right_value)
+
+        if types == "matrix-matrix":
+            return left_value @ right_value, None
+        
+        raise Exception(f"Ilegall types for @ (Matrix Multiplication Operation): {types}")
 
     if ast["tag"] == "/":
         left_value, l_status = evaluate(ast["left"], environment)
@@ -347,6 +382,8 @@ def evaluate(ast, environment):
             return value, "exit"
         types = type_of(value)
         if types == "number":
+            return -value, None
+        if types == "matrix":
             return -value, None
         raise Exception(f"Illegal type for {ast['tag']}:{types}")
 
@@ -766,6 +803,32 @@ def test_evaluate_multiplication():
     equals("(3+2)*2", {}, 10, {})
 
 
+def test_matrix_operations():
+    print("test matrix operations")
+
+    result, status = evaluate(parse(tokenize("|1,2;3,4| + |5,6;7,8|")), {})
+    assert np.array_equal(result, np.array([[6, 8], [10, 12]]))
+
+    result, status = evaluate(parse(tokenize("|5,6;7,8| - |1,2;3,4|")), {})
+    assert np.array_equal(result, np.array([[4, 4], [4, 4]]))
+
+    result, status = evaluate(parse(tokenize("|1,2;3,4| * |5,6;7,8|")), {})
+    assert np.array_equal(result, np.array([[5, 12], [21, 32]]))
+
+    result, status = evaluate(parse(tokenize("|1,2;3,4| @ |5,6;7,8|")), {})
+    assert np.array_equal(result, np.array([[19, 22], [43, 50]]))
+
+    result, status = evaluate(parse(tokenize("2 * |1,2;3,4|")), {})
+    assert np.array_equal(result, np.array([[2, 4], [6, 8]]))
+
+    result, status = evaluate(parse(tokenize("|1,2;3,4| * 2")), {})
+    assert np.array_equal(result, np.array([[2, 4], [6, 8]]))
+
+    result, status = evaluate(parse(tokenize("-|1,2;3,4|")), {})
+    assert np.array_equal(result, np.array([[-1, -2], [-3, -4]]))
+
+
+
 def test_evaluate_division():
     print("test evaluate division")
     equals("4/2", {}, 2, {})
@@ -776,7 +839,6 @@ def test_evaluate_negation():
     print("test evaluate negation")
     equals("-2", {}, -2, {})
     equals("--3", {}, 3, {})
-
 
 def test_evaluate_print_statement():
     print("test evaluate_print_statement")
@@ -1235,6 +1297,7 @@ if __name__ == "__main__":
     test_evaluate_addition()
     test_evaluate_subtraction()
     test_evaluate_multiplication()
+    test_matrix_operations()
     test_evaluate_division()
     test_evaluate_negation()
     test_evaluate_print_statement()

@@ -6,7 +6,7 @@ grammar = """
 
     simple_expression = identifier | <boolean> | <number> | <string> | <null> | matrix | list | object | ("-" simple_expression) | ("!" simple_expression) | function | ( "(" expression ")" )
 
-    row = <number> {"," <number> }
+    row = ["-"] <number> {"," ["-"] <number> }
     matrix = "|" row {";" row} "|"
     list = "[" expression { "," expression } "]"
     object = "{" [ expression ":" expression { "," expression ":" expression } ] "}"
@@ -15,7 +15,7 @@ grammar = """
     complex_expression = simple_expression { ("[" expression "]") | ("." identifier) | "(" [ expression { "," expression } ] ")" }
 
     arithmetic_factor = complex_expression
-    arithmetic_term = arithmetic_factor { ("*" | "/") arithmetic_factor }
+    arithmetic_term = arithmetic_factor { ("*" | "/" | "%" | "@") arithmetic_factor }
     arithmetic_expression = arithmetic_term { ("+" | "-") arithmetic_term }
     relational_expression = arithmetic_expression { ("<" | ">" | "<=" | ">=" | "==" | "!=") arithmetic_expression }
     logical_factor = relational_expression
@@ -49,7 +49,7 @@ grammar = """
 
 def parse_matrix(tokens):
     '''
-    row = <number> {"," <number> }
+    row = ["-"] <number> {"," ["-"] <number> }
     matrix = "|" row {";" row} "|"
     '''
     assert tokens[0]['tag'] == "|", f"Expected '|' at position {tokens[0]['position']}"
@@ -59,7 +59,11 @@ def parse_matrix(tokens):
 
     current_row_index = 0
     rows = [[]]
-    rows[current_row_index].append(tokens[0]["value"])
+    sign = -1 if tokens[0]["tag"] == "-" else 1
+    if tokens[0]["tag"] == "-":
+        tokens = tokens[1:]
+    assert tokens[0]["tag"] == "number", f"Expected number at position {tokens[0]['position']}"
+    rows[current_row_index].append(sign * tokens[0]["value"])
     tokens = tokens[1:]
     while tokens[0]["tag"] == "," or tokens[0]['tag'] == ';':
 
@@ -68,9 +72,12 @@ def parse_matrix(tokens):
             rows.append([])
 
         tokens = tokens[1:]
+        sign = -1 if tokens[0]["tag"] == "-" else 1
+        if tokens[0]["tag"] == "-":
+            tokens = tokens[1:]
         assert tokens[0]["tag"] == "number", f"Expected number at position {tokens[0]['position']}"
 
-        rows[current_row_index].append(tokens[0]["value"])
+        rows[current_row_index].append(sign * tokens[0]["value"])
         tokens = tokens[1:]
 
     assert (
@@ -114,6 +121,11 @@ def test_parse_matrix():
     ast, tokens = parse_matrix(tokenize("|1,2;3,4|"))
     assert ast["tag"] == "matrix"
     assert np.array_equal(ast["data"], np.array([[1, 2], [3, 4]]))
+    assert tokens[0]["tag"] is None
+
+    ast, tokens = parse_matrix(tokenize("|-1,2;-3,4|"))
+    assert ast["tag"] == "matrix"
+    assert np.array_equal(ast["data"], np.array([[-1, 2], [-3, 4]]))
     assert tokens[0]["tag"] is None
 
 # BASIC EXPRESSIONS
@@ -687,10 +699,10 @@ def test_parse_arithmetic_factor():
 
 def parse_arithmetic_term(tokens):
     """
-    arithmetic_term = arithmetic_factor { ("*" | "/") arithmetic_factor }
+    arithmetic_term = arithmetic_factor { ("*" | "/" | "%" | "@") arithmetic_factor }
     """
     node, tokens = parse_arithmetic_factor(tokens)
-    while tokens[0]["tag"] in ["*", "/", "%"]:
+    while tokens[0]["tag"] in ["*", "/", "%", "@"]:
         tag = tokens[0]["tag"]
         next_node, tokens = parse_arithmetic_factor(tokens[1:])
         node = {"tag": tag, "left": node, "right": next_node}
@@ -699,7 +711,7 @@ def parse_arithmetic_term(tokens):
 
 def test_parse_arithmetic_term():
     """
-    arithmetic_term = arithmetic_factor { ("*" | "/") arithmetic_factor }
+    arithmetic_term = arithmetic_factor { ("*" | "/" | "%" | "@") arithmetic_factor }
     """
     print("testing parse_arithmetic_term...")
     ast, tokens = parse_arithmetic_term(tokenize("x"))
@@ -719,11 +731,29 @@ def test_parse_arithmetic_term():
         "right": {"tag": "identifier", "value": "y"},
     }
 
+    ast, tokens = parse_arithmetic_term(tokenize("x@y"))
+    assert ast == {
+        "tag": "@",
+        "left": {"tag": "identifier", "value": "x"},
+        "right": {"tag": "identifier", "value": "y"},
+    }
+
     ast, tokens = parse_arithmetic_term(tokenize("x*y/z"))
     assert ast == {
         "tag": "/",
         "left": {
             "tag": "*",
+            "left": {"tag": "identifier", "value": "x"},
+            "right": {"tag": "identifier", "value": "y"},
+        },
+        "right": {"tag": "identifier", "value": "z"},
+    }
+
+    ast, tokens = parse_arithmetic_term(tokenize("x@y*z"))
+    assert ast == {
+        "tag": "*",
+        "left": {
+            "tag": "@",
             "left": {"tag": "identifier", "value": "x"},
             "right": {"tag": "identifier", "value": "y"},
         },

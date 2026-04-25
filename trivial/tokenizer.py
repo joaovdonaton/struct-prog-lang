@@ -27,6 +27,7 @@ patterns = [
     [r"\+", "+"],
     [r"\-", "-"],
     [r"\*", "*"],
+    [r"\@", "@"],
     [r"\/", "/"],
     [r"\%", "%"],
     [r"\(", "("],
@@ -138,7 +139,7 @@ def tokenize(characters, generated_tags=test_generated_tags):
 
 def test_simple_tokens():
     print("testing simple tokens...")
-    examples = ".,[,],+,-,*,/,(,),{,},;,:,!,&&,||,<,>,<=,>=,==,!=,=,%".split(",")
+    examples = ".,[,],+,-,*,/,(,),{,},;,:,!,&&,||,<,>,<=,>=,==,!=,=,%,@".split(",")
     examples.append(",")
     for example in examples:
         t = tokenize(example)[0]
@@ -476,12 +477,12 @@ def test_matrix_tokens():
 
     tokens = tokenize('x = |3; 2|') # 1x2 matrix
 
-    assert(
-        tokens[2]['tag'] == '|',
-        tokens[3]['value'] == 3,
-        tokens[4]['tag'] == ';',
-        tokens[5]['value'] == 2,
-        tokens[6]['tag'] == '|'
+    assert (
+        tokens[2]['tag'] == '|'
+        and tokens[3]['value'] == 3
+        and tokens[4]['tag'] == ';'
+        and tokens[5]['value'] == 2
+        and tokens[6]['tag'] == '|'
     )
     
     tokens = tokenize('x = |3, 99; 2, 13|') # 2x2 matrix
