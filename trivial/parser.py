@@ -12,7 +12,7 @@ grammar = """
     object = "{" [ expression ":" expression { "," expression ":" expression } ] "}"
     function = "function" "(" [ identifier { "," identifier } ] ")" statements
 
-    complex_expression = simple_expression { ("[" expression "]") | ("." identifier) | "(" [ expression { "," expression } ] ")" }
+    complex_expression = simple_expression { ("[" expression [ "," expression ] "]") | ("." identifier) | "(" [ expression { "," expression } ] ")" }
 
     arithmetic_factor = complex_expression
     arithmetic_term = arithmetic_factor { ("*" | "/" | "%" | "@") arithmetic_factor }
@@ -585,13 +585,16 @@ def test_parse_function():
 
 def parse_complex_expression(tokens):
     """
-    complex_expression = simple_expression { ( ) | ("." identifier) | "(" [ expression { "," expression } ] ")" }
+    complex_expression = simple_expression { ("[" expression [ "," expression ] "]") | ("." identifier) | "(" [ expression { "," expression } ] ")" }
     """
     ast, tokens = parse_simple_expression(tokens)
     while tokens[0]["tag"] in ["[", ".", "("]:
         if tokens[0]["tag"] == "[":
             tokens = tokens[1:]
             index_ast, tokens = parse_expression(tokens)
+            if tokens[0]["tag"] == ",":
+                column_ast, tokens = parse_expression(tokens[1:])
+                index_ast = {"tag": "list", "items": [index_ast, column_ast]}
             assert (
                 tokens[0]["tag"] == "]"
             ), f"Expected ']' at position {tokens[0]['position']}"
@@ -627,7 +630,7 @@ def parse_complex_expression(tokens):
 
 def test_parse_complex_expression():
     """
-    complex_expression = simple_expression { ("[" expression "]") | ("." identifier) | "(" [ expression { "," expression } ] ")" }
+    complex_expression = simple_expression { ("[" expression [ "," expression ] "]") | ("." identifier) | "(" [ expression { "," expression } ] ")" }
     """
     print("testing parse_complex_expression...")
     for s in ["x", '{"a":4,"b":"x"}', "{}"]:
@@ -638,6 +641,15 @@ def test_parse_complex_expression():
         "tag": "complex",
         "base": {"tag": "identifier", "value": "x"},
         "index": {"tag": "number", "value": 3},
+    }
+    ast, tokens = parse_complex_expression(tokenize("x[3,4]"))
+    assert ast == {
+        "tag": "complex",
+        "base": {"tag": "identifier", "value": "x"},
+        "index": {
+            "tag": "list",
+            "items": [{"tag": "number", "value": 3}, {"tag": "number", "value": 4}],
+        },
     }
     ast, tokens = parse_complex_expression(tokenize('x["x"]'))
     assert ast == {

@@ -177,7 +177,7 @@ def ast_to_string(ast):
     assert False, f"Unknown tag [{ast['tag']}] in AST"
 
 
-__builtin_functions = ["head", "tail", "length", "keys", "input", "T", 'inv', 'dot']
+__builtin_functions = ["head", "tail", "length", "keys", "input", "T", 'inv', 'dot', 'eigenize']
 
 
 def evaluate_builtin_function(function_name, args):
@@ -210,6 +210,21 @@ def evaluate_builtin_function(function_name, args):
         assert (args[0].shape[0] == args[1].shape[0]), f'Error: vectors must be of equal length: {args[0].shape[0]} and {args[1].shape[0]}'
 
         return np.dot(args[0], args[1]), None
+    
+    if function_name == 'eigenize':
+        assert len(args) == 1 and isinstance(
+            args[0], np.ndarray
+        ), "eigenize() function requires a matrix as input"
+
+        assert args[0].shape[0] == args[0].shape[1], 'You can only compute eigenvalues and eigenvectors for square matrices'
+
+        eigenvalues, eigenvectors = np.linalg.eig(args[0])
+
+        vec_out = []
+        for i in range(eigenvectors.shape[1]):
+            vec_out.append(eigenvectors[:, i].reshape(-1, 1))
+
+        return [eigenvalues.tolist(), vec_out], None
 
     if function_name == "head":
         assert len(args) == 1 and isinstance(
@@ -638,6 +653,19 @@ def evaluate(ast, environment):
             raise Exception(
                 f"TypeError: Cannot index with 'null'. Base: {base}, Index AST: {ast_to_string(ast['index'])}"
             )
+        if isinstance(base, np.ndarray):
+            assert isinstance(index, list) and len(index) == 2, "Matrix indexing requires row and column"
+            row, column = index
+            assert type(row) in [int, float] and int(row) == row, "Matrix row index must be integer"
+            assert type(column) in [int, float] and int(column) == column, "Matrix column index must be integer"
+            row = int(row)
+            column = int(column)
+            assert 0 <= row < base.shape[0], "Matrix row index out of range"
+            assert 0 <= column < base.shape[1], "Matrix column index out of range"
+            value = base[row, column]
+            if isinstance(value, np.generic):
+                return value.item(), None
+            return value, None
         if type(index) in [int, float]:
             assert int(index) == index
             assert type(base) == list
@@ -687,9 +715,20 @@ def evaluate(ast, environment):
 
             if index is None:
                 raise Exception("Cannot use 'null' as index for assignment.")
-            assert type(index) in [int, float, str], f"Unknown index type [{index}]"
+            assert type(index) in [int, float, str, list], f"Unknown index type [{index}]"
 
-            if isinstance(base, list):
+            if isinstance(base, np.ndarray):
+                assert isinstance(index, list) and len(index) == 2, "Matrix assignment requires row and column"
+                row, column = index
+                assert type(row) in [int, float] and int(row) == row, "Matrix row index must be integer"
+                assert type(column) in [int, float] and int(column) == column, "Matrix column index must be integer"
+                row = int(row)
+                column = int(column)
+                assert 0 <= row < base.shape[0], "Matrix row index out of range"
+                assert 0 <= column < base.shape[1], "Matrix column index out of range"
+                target_base = base
+                target_index = (row, column)
+            elif isinstance(base, list):
                 assert isinstance(index, int), "List index must be integer"
                 assert 0 <= index < len(base), "List index out of range"
                 target_base = base
@@ -1109,6 +1148,12 @@ def test_evaluate_complex_expression():
     result, _ = evaluate(ast, environment)
     assert result == 2
 
+    environment = {"x": np.array([[1, 2], [3, 4]])}
+    code = "x[1,0]"
+    ast = parse(tokenize(code))
+    result, _ = evaluate(ast, environment)
+    assert result == 3
+
     environment = {"x": {"a": {"x": 4, "y": 6}, "b": {"x": 5, "y": 7}}}
     code = 'x["b"]["y"]'
     ast = parse(tokenize(code))
@@ -1129,6 +1174,12 @@ def test_evaluate_complex_assignment():
     ast = parse(tokenize(code))
     result, _ = evaluate(ast, environment)
     assert environment["x"]["b"] == 4
+
+    environment = {"x": np.array([[1, 2], [3, 4]])}
+    code = "x[1,0]=9"
+    ast = parse(tokenize(code))
+    result, _ = evaluate(ast, environment)
+    assert environment["x"][1, 0] == 9
 
 
 def test_evaluate_builtins():
@@ -1167,7 +1218,7 @@ def test_matrix_builtins():
     assert result == 32
 
     result, status = evaluate(parse(tokenize("inv(|1,2;3,5|)")), {})
-    assert np.array_equal(result, np.array([[-5, 2], [3, -1]]))
+    assert np.allclose(result, np.array([[-5, 2], [3, -1]]))
 
 
 def test_evaluator_with_new_tags():
